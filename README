@@ -1,0 +1,133 @@
+k5prog - Quansheng UV-K5 EEPROM programmer v0.1
+(c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
+
+This program can read and write the eeprom of Quansheng UV-K5.
+It can read/write arbitrary data, and might be useful for making backups of
+the configuration, mass programming of radios or reverse engineering of 
+the radio configuration. Please note that it is probably possible to break 
+your radio by writing a bad configuration to it, so please use at your own 
+risk. 
+
+Note that this program does not edit the contents of the eeprom. Use an
+external hex editor.
+
+
+The program is written to (hopefully) run on POSIX systems. Testing was done 
+on GNU/Linux, but MacOS X and windows under cygwin should work too. 
+
+For licensing see the file LICENSE.
+
+
+---- Usage ----
+
+For a basic usage use -r to read eeprom, -w to write eeprom. The -v option
+gives more verbosity.
+
+Read configuration:
+
+sq5bpf@chronos:~/k5prog$ ./baoprog -r -v
+Quansheng UV-K5 EEPROM programmer v0.1 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
+
+k5_prepare: try 0
+******  Connected to firmware version: [k5_2.01.23]
+Sucessfuly read eeprom
+
+
+The eeprom contents are written to the file k5_eeprom.raw, this can be
+changed with the -f option.
+
+
+
+Write configuration from file k5_eeprom.raw:
+
+sq5bpf@chronos:~/chirp/k5prog$ ./baoprog -w -v
+Quansheng UV-K5 EEPROM programmer v0.1 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
+
+k5_prepare: try 0
+******  Connected to firmware version: [k5_2.01.23]
+Read file k5_eeprom.raw success
+Sucessfuly wrote eeprom
+
+The -w option writes only the memory blocks which are written by the original
+radio software, in the same order. The -W ioption writes all memory, possibly 
+allowing overwriting of calibration data (if there is any) or other data which
+may be critical to the proper functioning of your radio.
+
+
+Other configuration options are:
+
+Quansheng UV-K5 EEPROM programmer v0.1 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
+
+cmdline opts:
+-f <file>       filename that contains the eeprom dump (default: k5_eeprom.raw)
+-r      read eeprom
+-w      write eeprom like the original software does (warning: may brick your radio)
+-W      write all eeprom (even bigger warning: this is sure to brick your radio!)
+-p <port>       device name (default: /dev/ttyUSB0)
+-s <speed>      serial speed (default: 38400, the UV-K5 doesn't accept any other speed)
+-h      print this help
+-v      be verbose, use multiple times for more verbosity
+
+
+
+---- Compiling ----
+
+This software was tested to compile using gcc on GNU/Linux systems, using a
+simple makefile:
+
+sq5bpf@dellix:~/k5prog-0.1$ make
+gcc -O2 k5prog.c -o k5prog
+
+Other POSIX platforms should work also, including MacOS X. 
+
+The software compiles under Cygwin/Microsoft Windows, but has not been tested.
+According to the cygwin documentation you should use /dev/comX to use port comX
+(for example using com6: k5prog.exe -v -r -p /dev/com6)
+
+
+If port this to another platform, or do anything interesting with this
+software, tell me about it.
+
+---- Other uses ----
+
+The file uvk5_original_eeprom.raw contains an eeprom downloaded from a UV-K5
+radio.  Maybe it can be used to resurrect another radio of the same type 
+if it was broken (perhaps by the use of this software :).
+
+
+
+
+---- Protocol ----
+
+The programming protocol used by this software has been reverse engineered
+by observing communications between the radio and the original programming
+software. It is not a variation of the typical Baofeng-like protocol.
+
+
+The format of the datagram sent to the radio is:
+
+0xAB 0xCD len 0x00 <data bytes> <2 bytes CRC> 0xDC 0xBA
+
+The length is the length od the data bytes.
+
+The data is protected by a typical CRC-16 xmodem algorithm.
+The data bytes and the CRC are obfuscated by xor-in it with an 8-byte 
+sequence.
+
+Fortunately the eeprom data contains a lot of 0xFF and 0x00 bytes, so the XOR
+sequence is easy to find by observing the traffic.
+
+
+The datagram sent from the radio is the same, but the CRC field is set to
+0xFFFF. This shows that the CRC is not for data integrity, but for further
+obfuscation (same as the XOR).
+
+
+I intend to publish a further description of the protocol, and the eeprom
+contents, meanwhile the sources can be used as documentation.
+
+
+VY 73
+
+Jacek / SQ5BPF
+
