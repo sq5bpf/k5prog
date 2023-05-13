@@ -25,7 +25,7 @@ gives more verbosity.
 
 Read configuration:
 
-sq5bpf@chronos:~/k5prog$ ./baoprog -r -v
+sq5bpf@chronos:~/k5prog$ ./k5prog -r -v
 Quansheng UV-K5 EEPROM programmer v0.1 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
 k5_prepare: try 0
@@ -40,7 +40,7 @@ changed with the -f option.
 
 Write configuration from file k5_eeprom.raw:
 
-sq5bpf@chronos:~/chirp/k5prog$ ./baoprog -w -v
+sq5bpf@chronos:~/chirp/k5prog$ ./k5prog -w -v
 Quansheng UV-K5 EEPROM programmer v0.1 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
 k5_prepare: try 0
@@ -49,9 +49,13 @@ Read file k5_eeprom.raw success
 Sucessfuly wrote eeprom
 
 The -w option writes only the memory blocks which are written by the original
-radio software, in the same order. The -W ioption writes all memory, possibly 
-allowing overwriting of calibration data (if there is any) or other data which
-may be critical to the proper functioning of your radio.
+radio software, in the same order. 
+
+The -W option writes all memory, possibly allowing overwriting of calibration 
+data (if there is any) or other data which may be critical to the proper 
+functioning of your radio. I have used this on my radio, and it still works
+but please be extra-careful.
+
 
 
 Other configuration options are:
