@@ -1,4 +1,4 @@
-/* Quansheng UV-K5 EEPROM programmer v0.1 
+/* Quansheng UV-K5 EEPROM programmer v0.2 
  * (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
  *
  * This program can read and write the eeprom of Quansheng UVK5 Mark II 
@@ -46,15 +46,17 @@
 #include <stdint.h>
 #include "uvk5.h"
 
-#define VERSION "Quansheng UV-K5 EEPROM programmer v0.1 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
+#define VERSION "Quansheng UV-K5 EEPROM programmer v0.2 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
 
 #define MODE_NONE 0
 #define MODE_READ 1
 #define MODE_WRITE 2
-#define MODE_WRITE_ALL 3
+#define MODE_WRITE_MOST 3
+#define MODE_WRITE_ALL 4
 
 
 #define UVK5_EEPROM_SIZE 0x2000
+#define UVK5_EEPROM_SIZE_WITHOUT_CALIBRATION 0x1d00
 #define UVK5_EEPROM_BLOCKSIZE 0x80
 #define UVK5_PREPARE_TRIES 10
 
@@ -514,8 +516,9 @@ void helpme()
 			"cmdline opts:\n"
 			"-f <file>\tfilename that contains the eeprom dump (default: " DEFAULT_FILE_NAME ")\n"
 			"-r \tread eeprom\n"
-			"-w \twrite eeprom like the original software does (warning: may brick your radio)\n"
-			"-W \twrite all eeprom (even bigger warning: this is sure to brick your radio!)\n"
+			"-w \twrite eeprom like the original software does\n"
+			"-W \twrite most of the eeprom (but without what i think is calibration data)\n"
+			"-B \twrite ALL of the eeprom (the \"brick my radio\" mode)\n"
 			"-p <port>\tdevice name (default: " DEFAULT_SERIAL_PORT ")\n"
 			"-s <speed>\tserial speed (default: 38400, the UV-K5 doesn't accept any other speed)\n"
 			"-h \tprint this help\n"
@@ -585,7 +588,7 @@ void parse_cmdline(int argc, char **argv)
 	 * -v (verbose)
 	 */
 
-	while ((opt=getopt(argc,argv,"f:rwWp:s:hv"))!=EOF)
+	while ((opt=getopt(argc,argv,"f:rwWBp:s:hv"))!=EOF)
 	{
 		switch (opt)
 		{
@@ -603,6 +606,9 @@ void parse_cmdline(int argc, char **argv)
 				mode=MODE_WRITE;
 				break;
 			case 'W':
+				mode=MODE_WRITE_MOST;
+				break;
+			case 'B':
 				mode=MODE_WRITE_ALL;
 				break;
 			case 'f':
@@ -668,9 +674,8 @@ int main(int argc,char **argv)
 {
 	int fd,ffd;
 	unsigned char eeprom[UVK5_EEPROM_SIZE];
-	int i;
-	int r;
-	int j;
+	int i,r,j;
+
 	printf (VERSION "\n\n"); 
 	//debtest();
 
@@ -728,6 +733,7 @@ int main(int argc,char **argv)
 			break;
 
 		case MODE_WRITE:
+		case MODE_WRITE_MOST:
 		case MODE_WRITE_ALL:
 			/* read file */
 			ffd=open(file,O_RDONLY);
@@ -742,16 +748,19 @@ int main(int argc,char **argv)
 			}
 			close(ffd);
 			if (verbose>0) { printf ("Read file %s success\n",file); }
-			if (mode==MODE_WRITE_ALL) {
+			if ((mode==MODE_WRITE_ALL) || (mode==MODE_WRITE_MOST)) {
+				j=UVK5_EEPROM_SIZE_WITHOUT_CALIBRATION;
+				if (mode==MODE_WRITE_ALL) j=UVK5_EEPROM_SIZE;
+
 				/* write to radio */
-				for(i=0;i<UVK5_EEPROM_SIZE; i=i+UVK5_EEPROM_BLOCKSIZE) {
+				for(i=0;i<j; i=i+UVK5_EEPROM_BLOCKSIZE) {
 					if (!k5_writemem(fd,(unsigned char *)&eeprom[i],UVK5_EEPROM_BLOCKSIZE,i))
 					{
 						fprintf(stderr,"Failed to write block 0x%4.4X\n",i);
 						exit(1);
 					}
 					if (verbose>0) { 
-						printf("\rwrite block 0x%4.4X  %i%%",i,(100*i/UVK5_EEPROM_SIZE)); 
+						printf("\rwrite block 0x%4.4X  %i%%",i,(100*i/j)); 
 						fflush(stdout); 
 					}
 

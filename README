@@ -26,7 +26,7 @@ gives more verbosity.
 Read configuration:
 
 sq5bpf@chronos:~/k5prog$ ./k5prog -r -v
-Quansheng UV-K5 EEPROM programmer v0.1 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
+Quansheng UV-K5 EEPROM programmer v0.2 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
 k5_prepare: try 0
 ******  Connected to firmware version: [k5_2.01.23]
@@ -37,36 +37,44 @@ The eeprom contents are written to the file k5_eeprom.raw, this can be
 changed with the -f option.
 
 
-
 Write configuration from file k5_eeprom.raw:
 
 sq5bpf@chronos:~/chirp/k5prog$ ./k5prog -w -v
-Quansheng UV-K5 EEPROM programmer v0.1 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
+Quansheng UV-K5 EEPROM programmer v0.2 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
 k5_prepare: try 0
 ******  Connected to firmware version: [k5_2.01.23]
 Read file k5_eeprom.raw success
 Sucessfuly wrote eeprom
 
+
+
 The -w option writes only the memory blocks which are written by the original
 radio software, in the same order. 
 
-The -W option writes all memory, possibly allowing overwriting of calibration 
-data (if there is any) or other data which may be critical to the proper 
-functioning of your radio. I have used this on my radio, and it still works
-but please be extra-careful.
+The -W option is a bit more brave, it writes all memory upto 0x1d00. I _think_
+that the radio has calibration data above this address, but of course this is
+not certain, because this knowledge is a result of reverse engineering, and not
+information from the manufacturer.
+
+
+The -B option is the "brick my radio" mode. It writes all memory, possibly 
+allowing overwriting of calibration data (if there is any) or other data which
+may be critical to the proper functioning of your radio. I have used this on
+my radio, and it still works but please be extra-careful.
 
 
 
 Other configuration options are:
 
-Quansheng UV-K5 EEPROM programmer v0.1 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
+Quansheng UV-K5 EEPROM programmer v0.2 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
 cmdline opts:
 -f <file>       filename that contains the eeprom dump (default: k5_eeprom.raw)
 -r      read eeprom
--w      write eeprom like the original software does (warning: may brick your radio)
--W      write all eeprom (even bigger warning: this is sure to brick your radio!)
+-w      write eeprom like the original software does
+-W      write most of the eeprom (but without what i think is calibration data)
+-B      write ALL of the eeprom (the "brick my radio" mode)
 -p <port>       device name (default: /dev/ttyUSB0)
 -s <speed>      serial speed (default: 38400, the UV-K5 doesn't accept any other speed)
 -h      print this help
