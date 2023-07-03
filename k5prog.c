@@ -153,7 +153,7 @@ void hdump(unsigned char *buf,int len)
 		adump[tmp2*3]=hexz[sss/16];
 		adump[tmp2*3+1]=hexz[sss%16];
 
-		if isprint(sss) { adump[tmp2+50]=sss; } else adump[tmp2+50]='.';
+		if (isprint(sss)) { adump[tmp2+50]=sss; } else adump[tmp2+50]='.';
 	}
 	//if (((tmp1%16)!=0)||(len==16)) printf("0x%6.6x: %.69s\n",tmp3,adump);
 	if (lasttmp!=tmp1) printf("0x%6.6x: %.69s\n",tmp3,adump);
