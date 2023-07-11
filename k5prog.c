@@ -1,4 +1,4 @@
-/* Quansheng UV-K5 EEPROM programmer v0.3 
+/* Quansheng UV-K5 EEPROM programmer v0.4 
  * (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
  *
  * This program can read and write the eeprom of Quansheng UVK5 Mark II 
@@ -50,7 +50,7 @@
 #include <stdint.h>
 #include "uvk5.h"
 
-#define VERSION "Quansheng UV-K5 EEPROM programmer v0.3 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
+#define VERSION "Quansheng UV-K5 EEPROM programmer v0.4 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
 
 #define MODE_NONE 0
 #define MODE_READ 1
@@ -67,8 +67,11 @@
 #define UVK5_PREPARE_TRIES 10
 
 /* actually the flash is bigger, but there is a bootloader at 0xf000 that we don't want to overwrite 
- * if you're really brave, then you can modify the code and probably flash the bootloader too, but i would
- * really advise against doing this */
+ * if you're really brave, then you can modify the code by changing UVK5_MAX_FLASH_SIZE to 0x10000
+ * and probably flash the bootloader too, but i would really advise against doing this
+ *
+ * maybe at some point i will make a command line flag for this
+ */
 #define UVK5_MAX_FLASH_SIZE 0xf000 
 #define UVK5_FLASH_BLOCKSIZE 0x100
 
@@ -83,6 +86,9 @@ int verbose=0;
 int mode=MODE_NONE;
 char *file=DEFAULT_FILE_NAME;
 char *flash_file=DEFAULT_FLASH_NAME;
+
+int write_offset=0;
+int write_length=-1;
 
 int i_know_what_im_doing=0; /* flag the user sets to confirm that he thinks he knows what he's doing */
 
@@ -797,11 +803,15 @@ static speed_t baud_to_speed_t(int baud)
 void parse_cmdline(int argc, char **argv)
 {
 	int opt;
+	int tmpval;
 
+int res;
 	/* cmdline opts:
 	 * -f <file>
 	 * -b <flash file>
 	 * -F (flash firmware)
+	 * -O (hex offset)
+	 * -L (hex length)
 	 * -r (read)
 	 * -w (write)
 	 * -p <port>
@@ -813,7 +823,7 @@ void parse_cmdline(int argc, char **argv)
 	 * -Y (i know what i'm doing)
 	 */
 
-	while ((opt=getopt(argc,argv,"f:rwWBp:s:hvDFYb:"))!=EOF)
+	while ((opt=getopt(argc,argv,"f:rwWBp:s:hvDFYb:L:O:"))!=EOF)
 	{
 		switch (opt)
 		{
@@ -842,6 +852,20 @@ void parse_cmdline(int argc, char **argv)
 			case 'b':
 				flash_file=optarg;
 				break;
+			case 'O':
+				res=sscanf(optarg,"%x",&write_offset);
+				if (res!=1) {
+					fprintf(stderr,"ERROR, could not parse offset %s\n",optarg);
+					exit(1);
+				}
+				break;
+			case 'L':
+				res=sscanf(optarg,"%x",&write_length);
+				if (res!=1) {
+					fprintf(stderr,"ERROR, could not parse length %s\n",optarg);
+					exit(1);
+				}
+				break;
 			case 'W':
 				mode=MODE_WRITE_MOST;
 				break;
@@ -868,6 +892,16 @@ void parse_cmdline(int argc, char **argv)
 					break;
 				}
 		}
+	}
+	if ((mode==MODE_FLASH)&&(write_offset%UVK5_FLASH_BLOCKSIZE!=0))
+	{
+		fprintf(stderr,"ERROR: write offset has to be a multiple of %x\n",UVK5_FLASH_BLOCKSIZE);
+		exit(1);
+	}
+	if ((mode==MODE_WRITE)&&(write_offset%UVK5_EEPROM_BLOCKSIZE!=0))
+	{
+		fprintf(stderr,"ERROR: write offset has to be a multiple of %x\n",UVK5_EEPROM_BLOCKSIZE);
+		exit(1);
 	}
 }
 
@@ -913,6 +947,7 @@ int main(int argc,char **argv)
 	unsigned char eeprom[UVK5_EEPROM_SIZE];
 	unsigned char flash[UVK5_MAX_FLASH_SIZE];
 	int flash_length;
+	int flash_length2;
 	int i,r,j,len;
 
 	printf (VERSION "\n\n"); 
@@ -969,6 +1004,10 @@ int main(int argc,char **argv)
 				fprintf(stderr,"Failed to read whole eeprom from file %s (read %i), file too short or some other error\n",file,flash_length);
 				exit(1);
 			}
+			if ((write_length>0)&&((write_length+write_offset)>=UVK5_MAX_FLASH_SIZE))  {
+				fprintf(stderr,"write_length+write_offset is bigger than the flash size\n",file,flash_length);
+				exit(1);
+			}
 			close(ffd);
 
 			if (verbose>0) { printf ("Read file %s success\n",flash_file); }
@@ -979,7 +1018,17 @@ int main(int argc,char **argv)
 
 			k5_send_flash_version_message(fd);
 
-			for(i=0; i<flash_length; i+=UVK5_FLASH_BLOCKSIZE)
+			/* for(i=0; i<flash_length; i+=UVK5_FLASH_BLOCKSIZE) */
+			flash_length2=flash_length;
+			if (write_length>0) {
+				flash_length2=write_offset+write_length;
+				if (flash_length2%UVK5_FLASH_BLOCKSIZE>0) { 
+					flash_length2=flash_length2-flash_length2%UVK5_FLASH_BLOCKSIZE+UVK5_FLASH_BLOCKSIZE; 
+				}
+				if (flash_length2>flash_length) flash_length2=flash_length;
+				printf("Writing blocks from address 0x%x until 0x%x\n",write_offset,flash_length2);
+			}
+			for(i=write_offset; i<flash_length2; i+=UVK5_FLASH_BLOCKSIZE)
 			{
 				len=flash_length-i;
 				if (len>UVK5_FLASH_BLOCKSIZE) len=UVK5_FLASH_BLOCKSIZE;
