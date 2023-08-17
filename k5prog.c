@@ -1005,7 +1005,7 @@ int main(int argc,char **argv)
 				exit(1);
 			}
 			if ((write_length>0)&&((write_length+write_offset)>=UVK5_MAX_FLASH_SIZE))  {
-				fprintf(stderr,"write_length+write_offset is bigger than the flash size\n",file,flash_length);
+				fprintf(stderr,"write_length (%d) + write_offset (%d) is bigger than the flash size (%d)\n", write_length, write_offset, UVK5_MAX_FLASH_SIZE);
 				exit(1);
 			}
 			close(ffd);
