@@ -651,7 +651,7 @@ int k5_send_flash_version_message(int fd) {
 	return(1);
 }
 
-int k5_writeflash(int fd, unsigned char *buf, int  len, int offset)
+int k5_writeflash(int fd, unsigned char *buf, int  len, int offset, int fw_size_blocks)
 {
 	int l;
 	unsigned char writeflash[512];
@@ -679,7 +679,7 @@ int k5_writeflash(int fd, unsigned char *buf, int  len, int offset)
 
 	writeflash[8]=(offset>>8)&0xff;
 	writeflash[9]=offset&0xff;
-	writeflash[10]=0xe6;
+	writeflash[10]=fw_size_blocks&0xff; // bootloader probably uses this to determinate total fw len (in flash pages)
 	writeflash[11]=0x00;
 	writeflash[12]=len&0xff;
 	writeflash[13]=(len>>8)&0xff;
@@ -1033,7 +1033,7 @@ int main(int argc,char **argv)
 				len=flash_length-i;
 				if (len>UVK5_FLASH_BLOCKSIZE) len=UVK5_FLASH_BLOCKSIZE;
 
-				r=k5_writeflash(fd, (unsigned char *)&flash+i,len,i);
+				r=k5_writeflash(fd, (unsigned char *)&flash+i,len,i,(flash_length+0xFF)/0x100);
 
 				printf("*** FLASH at 0x%4.4x length 0x%4.4x  result=%i\n",i,len,r);
 				if (!r) {
