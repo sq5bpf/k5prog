@@ -50,7 +50,7 @@
 #include <stdint.h>
 #include "uvk5.h"
 
-#define VERSION "Quansheng UV-K5 EEPROM programmer v0.4 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
+#define VERSION "Quansheng UV-K5 EEPROM programmer v0.5 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
 
 #define MODE_NONE 0
 #define MODE_READ 1
@@ -651,7 +651,7 @@ int k5_send_flash_version_message(int fd) {
 	return(1);
 }
 
-int k5_writeflash(int fd, unsigned char *buf, int  len, int offset)
+int k5_writeflash(int fd, unsigned char *buf, int  len, int offset,int max_flash_addr)
 {
 	int l;
 	unsigned char writeflash[512];
@@ -679,8 +679,10 @@ int k5_writeflash(int fd, unsigned char *buf, int  len, int offset)
 
 	writeflash[8]=(offset>>8)&0xff;
 	writeflash[9]=offset&0xff;
-	writeflash[10]=0xe6;
+	//writeflash[10]=0xe6;
+	writeflash[10]=(max_flash_addr>>8)&0xff;
 	writeflash[11]=0x00;
+	//writeflash[11]=max_flash_addr&0xff;
 	writeflash[12]=len&0xff;
 	writeflash[13]=(len>>8)&0xff;
 	writeflash[14]=0x00;
@@ -741,8 +743,10 @@ void helpme()
 			"-f <file>\tfilename that contains the eeprom dump (default: " DEFAULT_FILE_NAME ")\n"
 			"-b <file>\tfilename that contains the raw flash image (default " DEFAULT_FLASH_NAME ")\n"
 			"-Y \tincrease \"I know what i'm doing\" value, to enable functionality likely to break the radio\n"
-			"-D\twait for the message from the radio flasher, print it's version\n"
-			"-F\tflash firmware, WARNING: this will likely brick your radio!\n"
+			"-D \twait for the message from the radio flasher, print it's version\n"
+			"-F \tflash firmware, WARNING: this will likely brick your radio!\n"
+			"-O \toffset of block to flash in hex (default: 0)\n"
+			"-L \tlength of file to flash in hex (default: all)\n"
 			"-r \tread eeprom\n"
 			"-w \twrite eeprom like the original software does\n"
 			"-W \twrite most of the eeprom (but without what i think is calibration data)\n"
@@ -805,7 +809,7 @@ void parse_cmdline(int argc, char **argv)
 	int opt;
 	int tmpval;
 
-int res;
+	int res;
 	/* cmdline opts:
 	 * -f <file>
 	 * -b <flash file>
@@ -947,7 +951,8 @@ int main(int argc,char **argv)
 	unsigned char eeprom[UVK5_EEPROM_SIZE];
 	unsigned char flash[UVK5_MAX_FLASH_SIZE];
 	int flash_length;
-	int flash_length2;
+	int flash_max_addr;
+	int flash_max_block_addr;
 	int i,r,j,len;
 
 	printf (VERSION "\n\n"); 
@@ -999,41 +1004,44 @@ int main(int argc,char **argv)
 				exit(1);
 			}
 			flash_length=read(ffd,(unsigned char *)&flash,UVK5_MAX_FLASH_SIZE);
+			close(ffd);
+
 			/* arbitrary limit do that someone doesn't flash some random short file */
 			if (flash_length<50000) {
 				fprintf(stderr,"Failed to read whole eeprom from file %s (read %i), file too short or some other error\n",file,flash_length);
 				exit(1);
 			}
-			if ((write_length>0)&&((write_length+write_offset)>=UVK5_MAX_FLASH_SIZE))  {
-				fprintf(stderr,"write_length (%d) + write_offset (%d) is bigger than the flash size (%d)\n", write_length, write_offset, UVK5_MAX_FLASH_SIZE);
+			if (verbose>0) { printf ("Read file %s success\n",flash_file); }
+			flash_max_addr=flash_length;
+
+			if (write_length>0)  flash_max_addr=write_offset+write_length;
+			if (flash_max_addr>flash_length) flash_max_addr=flash_length;
+
+			if (flash_max_addr&0xff) {
+				flash_max_block_addr=(flash_max_addr&0xff00)+UVK5_FLASH_BLOCKSIZE;
+			} else {
+				flash_max_block_addr=(flash_max_addr&0xff00);
+			}
+
+			printf("Writing blocks from address 0x%x until 0x%x, firmware size is 0x%x\n",write_offset,flash_max_block_addr,flash_length);
+
+
+			if (flash_max_block_addr>UVK5_MAX_FLASH_SIZE)  {
+				fprintf(stderr,"flash length 0x%x is greater than max flash size 0x%s\n",flash_max_block_addr,UVK5_MAX_FLASH_SIZE);
 				exit(1);
 			}
-			close(ffd);
 
-			if (verbose>0) { printf ("Read file %s success\n",flash_file); }
+			   r=wait_flash_message(fd,10000);
+			   if (!r) exit(0);
 
+			   k5_send_flash_version_message(fd);
 
-			r=wait_flash_message(fd,10000);
-			if (!r) exit(0);
-
-			k5_send_flash_version_message(fd);
-
-			/* for(i=0; i<flash_length; i+=UVK5_FLASH_BLOCKSIZE) */
-			flash_length2=flash_length;
-			if (write_length>0) {
-				flash_length2=write_offset+write_length;
-				if (flash_length2%UVK5_FLASH_BLOCKSIZE>0) { 
-					flash_length2=flash_length2-flash_length2%UVK5_FLASH_BLOCKSIZE+UVK5_FLASH_BLOCKSIZE; 
-				}
-				if (flash_length2>flash_length) flash_length2=flash_length;
-				printf("Writing blocks from address 0x%x until 0x%x\n",write_offset,flash_length2);
-			}
-			for(i=write_offset; i<flash_length2; i+=UVK5_FLASH_BLOCKSIZE)
+			for(i=write_offset; i<flash_max_addr; i+=UVK5_FLASH_BLOCKSIZE)
 			{
-				len=flash_length-i;
+				len=flash_max_addr-i;
 				if (len>UVK5_FLASH_BLOCKSIZE) len=UVK5_FLASH_BLOCKSIZE;
 
-				r=k5_writeflash(fd, (unsigned char *)&flash+i,len,i);
+				r=k5_writeflash(fd, (unsigned char *)&flash+i,len,i,flash_max_block_addr);
 
 				printf("*** FLASH at 0x%4.4x length 0x%4.4x  result=%i\n",i,len,r);
 				if (!r) {
