@@ -1007,7 +1007,8 @@ int main(int argc,char **argv)
 			close(ffd);
 
 			/* arbitrary limit do that someone doesn't flash some random short file */
-			if (flash_length<50000) {
+			/* reduced from 50k as LTO builds can be smaller and fail this check */
+			if (flash_length<40000) {
 				fprintf(stderr,"Failed to read whole eeprom from file %s (read %i), file too short or some other error\n",file,flash_length);
 				exit(1);
 			}
