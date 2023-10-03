@@ -1,4 +1,4 @@
-/* Quansheng UV-K5 EEPROM programmer v0.4 
+/* Quansheng UV-K5 EEPROM programmer v0.6 
  * (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
  *
  * This program can read and write the eeprom of Quansheng UVK5 Mark II 
@@ -50,7 +50,7 @@
 #include <stdint.h>
 #include "uvk5.h"
 
-#define VERSION "Quansheng UV-K5 EEPROM programmer v0.5 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
+#define VERSION "Quansheng UV-K5 EEPROM programmer v0.6 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
 
 #define MODE_NONE 0
 #define MODE_READ 1
@@ -709,7 +709,7 @@ int k5_writeflash(int fd, unsigned char *buf, int  len, int offset,int max_flash
 		}
 		/* we're still getting "i'm in flash mode packets", can happen after the first flash command, ignore it */
 		if ((cmd->cmd[0]==0x18)&&(cmd->cmd[1]==0x05)&&(cmd->cmd[2]==0x20)&&(cmd->cmd[3]==0x0)&&(cmd->cmd[4]==0x1)&&(cmd->cmd[5]==0x2)&&(cmd->cmd[6]==0x2)) {
-		if (verbose>1)  printf("&&&&|  ignoring \"i'm in flash mode\" packet\n");
+			if (verbose>1)  printf("&&&&|  ignoring \"i'm in flash mode\" packet\n");
 			destroy_k5_struct(cmd);
 			continue;
 		}
@@ -1007,8 +1007,11 @@ int main(int argc,char **argv)
 			close(ffd);
 
 			/* arbitrary limit do that someone doesn't flash some random short file */
-			if (flash_length<50000) {
+			if ((i_know_what_im_doing<5)&&(flash_length<50000)) {
 				fprintf(stderr,"Failed to read whole eeprom from file %s (read %i), file too short or some other error\n",file,flash_length);
+				if (flash_length>0) {
+					fprintf(stderr,"This failsafe is here so that people don't mistake config files with flash.\nIt can be ignored with an 'i know what i'm doing' value of at least 5\n");
+				}
 				exit(1);
 			}
 			if (verbose>0) { printf ("Read file %s success\n",flash_file); }
@@ -1031,10 +1034,10 @@ int main(int argc,char **argv)
 				exit(1);
 			}
 
-			   r=wait_flash_message(fd,10000);
-			   if (!r) exit(0);
+			r=wait_flash_message(fd,10000);
+			if (!r) exit(0);
 
-			   k5_send_flash_version_message(fd);
+			k5_send_flash_version_message(fd);
 
 			for(i=write_offset; i<flash_max_addr; i+=UVK5_FLASH_BLOCKSIZE)
 			{
