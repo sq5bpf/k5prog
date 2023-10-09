@@ -1,4 +1,4 @@
-k5prog - Quansheng UV-K5 EEPROM and flash programmer  v0.6
+k5prog - Quansheng UV-K5 EEPROM and flash programmer  v0.7
 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
 This program can read and write the eeprom of Quansheng UV-K5.
@@ -49,6 +49,7 @@ cmdline opts:
 -Y      increase "I know what i'm doing" value, to enable functionality likely to break the radio
 -D      wait for the message from the radio flasher, print it's version
 -F      flash firmware, WARNING: this will likely brick your radio!
+-M <ver>        Set the firmware major version to <ver> during the flash process (default: *.01.23)
 -O      offset of block to flash in hex (default: 0)
 -L      length of file to flash in hex (default: all)
 -r      read eeprom
@@ -175,41 +176,12 @@ Flasher version is: [2.00.06]
 etc... until all flash is writtem
 
 
-It is possible to overwrite only one flash block. Each block has 0x100 bytes
-size. The offset can be specified by the -O option, and the length by the -L
-option. The length is rounded up to the nearest block size.
+It is possible to set the flashed firmware version, which will be later
+checked by the bootloader. Currently this is set to *.01.23, which all
+known bootloaders will accept, but can be set explicitly to some firmware
+version like:
 
-For example program 0x300 bytes starting at offset 0xe000:
-
-./k5prog -b k5_flash.raw  -YYYYYY -F -L 0x300 -O 0xe000
-
-Quansheng UV-K5 EEPROM programmer v0.5 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
-
-"I know what i'm doing" value set to 6
-********  k5 command hexdump [obf_len:44 clear_len:36 crc_ok:1 **********
-## obfuscated ##
-
-0x00002c |0 |1 |2 |3 |4 |5 |6 |7 |8 |9 |a |b |c |d |e |f |
----------+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+------------
-0x000000: ab cd 24 00 0e 69 34 e6 2f 93 0f 46 3d 66 85 0a   ..$..i4./..F=f..   
-0x000010: 24 44 16 8f 9a 6c 47 e6 1c bf 3d 70 0f 05 e3 40   $D...lG...=p...@   
-0x000020: 27 09 e9 80 16 6c 14 c6 d1 6e dc ba               '....l...n..       
-## cleartext ##
-
-0x000024 |0 |1 |2 |3 |4 |5 |6 |7 |8 |9 |a |b |c |d |e |f |
----------+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+------------
-0x000000: 18 05 20 00 01 02 02 06 1c 53 50 4a 37 47 ff 0f   .. ......SPJ7G..   
-0x000010: 8c 00 53 00 32 2e 30 30 2e 30 36 00 34 0a 00 00   ..S.2.00.06.4...   
-0x000020: 00 00 00 20                                       ...                
-*****************
-Flasher version is: [2.00.06]
-Writing blocks from address 0xe000 until 0xe300
-*** FLASH at 0xe000 length 0x0100  result=1
-*** FLASH at 0xe100 length 0x0100  result=1
-*** FLASH at 0xe200 length 0x0100  result=1
-
-
-
+/k5prog  -YYY -F -M '2.01.23' -b firmware.bin
 
 
 ---- Compiling ----

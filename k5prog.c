@@ -1,4 +1,4 @@
-/* Quansheng UV-K5 EEPROM programmer v0.6 
+/* Quansheng UV-K5 EEPROM programmer v0.7 
  * (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
  *
  * This program can read and write the eeprom of Quansheng UVK5 Mark II 
@@ -50,7 +50,7 @@
 #include <stdint.h>
 #include "uvk5.h"
 
-#define VERSION "Quansheng UV-K5 EEPROM programmer v0.6 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
+#define VERSION "Quansheng UV-K5 EEPROM programmer v0.7 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
 
 #define MODE_NONE 0
 #define MODE_READ 1
@@ -79,6 +79,9 @@
 #define DEFAULT_FILE_NAME "k5_eeprom.raw"
 #define DEFAULT_FLASH_NAME "k5_flash.raw"
 
+/* the vendor flasher sends the firmware version like "2.01.23" */
+#define DEFAULT_FLASH_VERSION "*.01.23"
+
 /* globals */
 speed_t ser_speed=B38400;
 char *ser_port=DEFAULT_SERIAL_PORT;
@@ -86,6 +89,8 @@ int verbose=0;
 int mode=MODE_NONE;
 char *file=DEFAULT_FILE_NAME;
 char *flash_file=DEFAULT_FLASH_NAME;
+
+char flash_version_string[8]=DEFAULT_FLASH_VERSION;
 
 int write_offset=0;
 int write_length=-1;
@@ -631,13 +636,17 @@ int wait_flash_message(int fd,int ntimes) {
  * unobfuscated firmware will have the version number in 16 bytes at 0x2000
  * probably these bytes are sent.
  *
- * currently this is hardcoded to 2.01.23
+ * the vendor flasher sends the real version,  something like  2.01.23
+ * if we send a * as the first character, then all known bootloaders
+ * will accept it
  */
-int k5_send_flash_version_message(int fd) {
+int k5_send_flash_version_message(int fd,char *version_string) {
 
 	int r;
 	struct k5_command *cmd;
-	unsigned char uvk5_flash_version[]={ 0x30, 0x5, 0x10, 0x0, '2', '.', '0', '1', '.', '2', '3', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+	//unsigned char uvk5_flash_version[]={ 0x30, 0x5, 0x10, 0x0, '2', '.', '0', '1', '.', '2', '3', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+	unsigned char uvk5_flash_version[]={ 0x30, 0x5, 0x10, 0x0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+	strncpy ((char *)&uvk5_flash_version+4,flash_version_string,8);
 	r=k5_send_buf(fd,uvk5_flash_version,sizeof(uvk5_flash_version));
 	if (!r) return(0);
 
@@ -745,6 +754,7 @@ void helpme()
 			"-Y \tincrease \"I know what i'm doing\" value, to enable functionality likely to break the radio\n"
 			"-D \twait for the message from the radio flasher, print it's version\n"
 			"-F \tflash firmware, WARNING: this will likely brick your radio!\n"
+			"-M <ver> \tSet the firmware major version to <ver> during the flash process (default: " DEFAULT_FLASH_VERSION ")\n"
 			"-O \toffset of block to flash in hex (default: 0)\n"
 			"-L \tlength of file to flash in hex (default: all)\n"
 			"-r \tread eeprom\n"
@@ -827,7 +837,7 @@ void parse_cmdline(int argc, char **argv)
 	 * -Y (i know what i'm doing)
 	 */
 
-	while ((opt=getopt(argc,argv,"f:rwWBp:s:hvDFYb:L:O:"))!=EOF)
+	while ((opt=getopt(argc,argv,"f:rwWBp:s:hvDFYb:L:O:M:"))!=EOF)
 	{
 		switch (opt)
 		{
@@ -855,6 +865,9 @@ void parse_cmdline(int argc, char **argv)
 				break;
 			case 'b':
 				flash_file=optarg;
+				break;
+			case 'M':
+				strncpy(flash_version_string,optarg,sizeof(flash_version_string)-1);
 				break;
 			case 'O':
 				res=sscanf(optarg,"%x",&write_offset);
@@ -1037,7 +1050,7 @@ int main(int argc,char **argv)
 			r=wait_flash_message(fd,10000);
 			if (!r) exit(0);
 
-			k5_send_flash_version_message(fd);
+			k5_send_flash_version_message(fd,flash_version_string);
 
 			for(i=write_offset; i<flash_max_addr; i+=UVK5_FLASH_BLOCKSIZE)
 			{
