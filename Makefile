@@ -1,7 +1,7 @@
 # Makefile for k5prog
 
 CC=gcc
-COPTS=-g
+COPTS=-g -O2 -Wall
 
 default: k5prog
 

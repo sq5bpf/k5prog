@@ -143,7 +143,7 @@ void hdump(unsigned char *buf,int len)
 	unsigned char sss;
 	char hexz[]="0123456789abcdef";
 
-	int lasttmp;
+	int lasttmp=0;
 
 	printf("\n0x%6.6x |0 |1 |2 |3 |4 |5 |6 |7 |8 |9 |a |b |c |d |e |f |\n",len);
 	printf("---------+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+------------\n");
@@ -264,7 +264,7 @@ void destroy_k5_struct(struct k5_command *cmd)
 }
 
 /* ripped from https://mdfs.net/Info/Comp/Comms/CRC16.htm */
-uint16_t crc16xmodem(char *addr, int num, int crc)
+uint16_t crc16xmodem(unsigned char *addr, int num, int crc)
 {
 #define poly 0x1021
 	int i;
@@ -414,7 +414,6 @@ int k5_send_buf(int fd,unsigned char *buf,int len) {
 /* receive a response, deobfuscate it */
 struct k5_command *k5_receive(int fd,int tmout) {
 	unsigned char buf[4];
-	unsigned char buf2[2048];
 	struct k5_command *cmd;
 	int len;
 
@@ -460,7 +459,6 @@ struct k5_command *k5_receive(int fd,int tmout) {
 /******************************/
 int k5_readmem(int fd, unsigned char *buf, unsigned char maxlen, int offset)
 {
-	int l;
 	unsigned char readmem[sizeof(uvk5_readmem1)];
 
 
@@ -491,7 +489,6 @@ int k5_readmem(int fd, unsigned char *buf, unsigned char maxlen, int offset)
 
 int k5_writemem(int fd, unsigned char *buf, unsigned char len, int offset)
 {
-	int l;
 	unsigned char writemem[512];
 
 
@@ -539,9 +536,7 @@ int k5_writemem(int fd, unsigned char *buf, unsigned char len, int offset)
 /* reset the radio */
 int k5_reset(int fd)
 {
-	int l;
 	int r;
-	struct k5_command *cmd;
 
 	if (verbose>1) printf("@@@@@@@@@@@@@@@@@@    reset\n");
 	r=k5_send_buf(fd,uvk5_reset,sizeof(uvk5_reset));
@@ -817,7 +812,6 @@ static speed_t baud_to_speed_t(int baud)
 void parse_cmdline(int argc, char **argv)
 {
 	int opt;
-	int tmpval;
 
 	int res;
 	/* cmdline opts:
@@ -1043,7 +1037,7 @@ int main(int argc,char **argv)
 
 
 			if (flash_max_block_addr>UVK5_MAX_FLASH_SIZE)  {
-				fprintf(stderr,"flash length 0x%x is greater than max flash size 0x%s\n",flash_max_block_addr,UVK5_MAX_FLASH_SIZE);
+				fprintf(stderr,"flash length 0x%x is greater than max flash size 0x%x\n",flash_max_block_addr,UVK5_MAX_FLASH_SIZE);
 				exit(1);
 			}
 
