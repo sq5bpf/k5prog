@@ -1,4 +1,4 @@
-/* Quansheng UV-K5 EEPROM programmer v0.7 
+/* Quansheng UV-K5 EEPROM programmer v0.8 
  * (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
  *
  * This program can read and write the eeprom of Quansheng UVK5 Mark II 
@@ -50,7 +50,7 @@
 #include <stdint.h>
 #include "uvk5.h"
 
-#define VERSION "Quansheng UV-K5 EEPROM programmer v0.7 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
+#define VERSION "Quansheng UV-K5 EEPROM programmer v0.8 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
 
 #define MODE_NONE 0
 #define MODE_READ 1
@@ -581,7 +581,8 @@ int wait_flash_message(int fd,int ntimes) {
 			destroy_k5_struct(cmd);
 			continue;
 		}
-		if (cmd->len!=36) {
+		/* 36 is normal length, 22 is sent by some LSENG UV-K5 clone */
+		if ((cmd->len!=36)&&(cmd->len!=22)) {
 			printf("wait_flash_message: got unexpected command length %i\n",cmd->len);
 			destroy_k5_struct(cmd);
 			continue;
@@ -750,8 +751,6 @@ void helpme()
 			"-D \twait for the message from the radio flasher, print it's version\n"
 			"-F \tflash firmware, WARNING: this will likely brick your radio!\n"
 			"-M <ver> \tSet the firmware major version to <ver> during the flash process (default: " DEFAULT_FLASH_VERSION ")\n"
-			"-O \toffset of block to flash in hex (default: 0)\n"
-			"-L \tlength of file to flash in hex (default: all)\n"
 			"-r \tread eeprom\n"
 			"-w \twrite eeprom like the original software does\n"
 			"-W \twrite most of the eeprom (but without what i think is calibration data)\n"
@@ -813,13 +812,10 @@ void parse_cmdline(int argc, char **argv)
 {
 	int opt;
 
-	int res;
 	/* cmdline opts:
 	 * -f <file>
 	 * -b <flash file>
 	 * -F (flash firmware)
-	 * -O (hex offset)
-	 * -L (hex length)
 	 * -r (read)
 	 * -w (write)
 	 * -p <port>
@@ -831,7 +827,7 @@ void parse_cmdline(int argc, char **argv)
 	 * -Y (i know what i'm doing)
 	 */
 
-	while ((opt=getopt(argc,argv,"f:rwWBp:s:hvDFYb:L:O:M:"))!=EOF)
+	while ((opt=getopt(argc,argv,"f:rwWBp:s:hvDFYb:M:"))!=EOF)
 	{
 		switch (opt)
 		{
@@ -862,20 +858,6 @@ void parse_cmdline(int argc, char **argv)
 				break;
 			case 'M':
 				strncpy(flash_version_string,optarg,sizeof(flash_version_string)-1);
-				break;
-			case 'O':
-				res=sscanf(optarg,"%x",&write_offset);
-				if (res!=1) {
-					fprintf(stderr,"ERROR, could not parse offset %s\n",optarg);
-					exit(1);
-				}
-				break;
-			case 'L':
-				res=sscanf(optarg,"%x",&write_length);
-				if (res!=1) {
-					fprintf(stderr,"ERROR, could not parse length %s\n",optarg);
-					exit(1);
-				}
 				break;
 			case 'W':
 				mode=MODE_WRITE_MOST;
