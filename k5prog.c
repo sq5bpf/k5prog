@@ -1,4 +1,4 @@
-/* Quansheng UV-K5 EEPROM programmer v0.8 
+/* Quansheng UV-K5 EEPROM programmer v0.9 
  * (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
  *
  * This program can read and write the eeprom of Quansheng UVK5 Mark II 
@@ -50,7 +50,7 @@
 #include <stdint.h>
 #include "uvk5.h"
 
-#define VERSION "Quansheng UV-K5 EEPROM programmer v0.8 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
+#define VERSION "Quansheng UV-K5 EEPROM programmer v0.9 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>"
 
 #define MODE_NONE 0
 #define MODE_READ 1
@@ -581,8 +581,9 @@ int wait_flash_message(int fd,int ntimes) {
 			destroy_k5_struct(cmd);
 			continue;
 		}
-		/* 36 is normal length, 22 is sent by some LSENG UV-K5 clone */
-		if ((cmd->len!=36)&&(cmd->len!=22)) {
+		/* 36 is normal length, 22 is sent by some LSENG UV-K5 clone, 
+		 * 20 is sent by some other version, so just use an arbitrarily chosen range */
+		if ((cmd->len<18)||(cmd->len>50)) {
 			printf("wait_flash_message: got unexpected command length %i\n",cmd->len);
 			destroy_k5_struct(cmd);
 			continue;

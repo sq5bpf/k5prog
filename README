@@ -1,4 +1,4 @@
-k5prog - Quansheng UV-K5 EEPROM and flash programmer  v0.8
+k5prog - Quansheng UV-K5 EEPROM and flash programmer  v0.9
 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
 This program can read and write the eeprom of Quansheng UV-K5.
