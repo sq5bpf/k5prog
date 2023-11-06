@@ -1,7 +1,7 @@
 /* Quansheng UV-K5 EEPROM programmer v0.9 
  * (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
  *
- * This program can read and write the eeprom of Quansheng UVK5 Mark II 
+ * This program can read and write the EEPROM of Quansheng UVK5 Mark II 
  * and probably other similar radios via the serial port. 
  *
  * It can read/write arbitrary data, and might be useful for reverse
@@ -110,8 +110,8 @@ unsigned char uvk5_hello2[]={0x14, 0x05, 0x04, 0x00, 0x9f, 0x25, 0x5a, 0x64};
 
 /* commands:
  * 0x14 - hello
- * 0x1b - read eeprom
- * 0x1d - write eeprom
+ * 0x1b - read EEPROM
+ * 0x1d - write EEPROM
  * 0xdd - reset radio
  */
 
@@ -455,7 +455,7 @@ struct k5_command *k5_receive(int fd,int tmout) {
 	return(cmd);
 }
 /******************************/
-/*  eeprom read/write support */
+/*  EEPROM read/write support */
 /******************************/
 int k5_readmem(int fd, unsigned char *buf, unsigned char maxlen, int offset)
 {
@@ -542,7 +542,7 @@ int k5_reset(int fd)
 	r=k5_send_buf(fd,uvk5_reset,sizeof(uvk5_reset));
 	return(r);
 }	
-/*  end of eeprom read/write support */
+/*  end of EEPROM read/write support */
 
 
 /******************************/
