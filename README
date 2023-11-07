@@ -220,7 +220,7 @@ The format of the datagram sent to the radio is:
 
 0xAB 0xCD len 0x00 <data bytes> <2 bytes CRC> 0xDC 0xBA
 
-The length is the length od the data bytes.
+The length is the length of the data bytes.
 
 The data is protected by a typical CRC-16 xmodem algorithm.
 The data bytes and the CRC are obfuscated by xor-in it with an 8-byte 
