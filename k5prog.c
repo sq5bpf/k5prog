@@ -42,6 +42,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <termios.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -935,6 +936,114 @@ int k5_prepare(int fd) {
 	return(1);
 }
 
+#define CRC_POLY16 0x1021
+// slow bit-bang based
+// https://github.com/OneOfEleven/k5prog-win/blob/a8af838b91bf17027179881accc1701949d66a0b/Unit1.cpp#L1192C2-L1192C2
+uint16_t crc16(const uint8_t *data, const int size)
+{
+	uint16_t crc = 0;
+	if (data != NULL && size > 0)
+	{
+		for (int i = 0; i < size; i++)
+		{
+			crc ^= (uint16_t)data[i] << 8;
+			for (unsigned int k = 8; k > 0; k--)
+				crc = (crc & 0x8000) ? (crc << 1) ^ CRC_POLY16 : crc << 1;
+		}
+	}
+	return crc;
+}
+
+// (de)obfuscate firmware data
+// https://github.com/OneOfEleven/k5prog-win/blob/a8af838b91bf17027179881accc1701949d66a0b/Unit1.cpp#L1456
+void k5_xor_firmware(uint8_t *data, const int len)
+{
+	static const uint8_t xor_pattern[] =
+	{
+		0x47, 0x22, 0xc0, 0x52, 0x5d, 0x57, 0x48, 0x94, 0xb1, 0x60, 0x60, 0xdb, 0x6f, 0xe3, 0x4c, 0x7c,
+		0xd8, 0x4a, 0xd6, 0x8b, 0x30, 0xec, 0x25, 0xe0, 0x4c, 0xd9, 0x00, 0x7f, 0xbf, 0xe3, 0x54, 0x05,
+		0xe9, 0x3a, 0x97, 0x6b, 0xb0, 0x6e, 0x0c, 0xfb, 0xb1, 0x1a, 0xe2, 0xc9, 0xc1, 0x56, 0x47, 0xe9,
+		0xba, 0xf1, 0x42, 0xb6, 0x67, 0x5f, 0x0f, 0x96, 0xf7, 0xc9, 0x3c, 0x84, 0x1b, 0x26, 0xe1, 0x4e,
+		0x3b, 0x6f, 0x66, 0xe6, 0xa0, 0x6a, 0xb0, 0xbf, 0xc6, 0xa5, 0x70, 0x3a, 0xba, 0x18, 0x9e, 0x27,
+		0x1a, 0x53, 0x5b, 0x71, 0xb1, 0x94, 0x1e, 0x18, 0xf2, 0xd6, 0x81, 0x02, 0x22, 0xfd, 0x5a, 0x28,
+		0x91, 0xdb, 0xba, 0x5d, 0x64, 0xc6, 0xfe, 0x86, 0x83, 0x9c, 0x50, 0x1c, 0x73, 0x03, 0x11, 0xd6,
+		0xaf, 0x30, 0xf4, 0x2c, 0x77, 0xb2, 0x7d, 0xbb, 0x3f, 0x29, 0x28, 0x57, 0x22, 0xd6, 0x92, 0x8b
+	};
+
+	if (data == NULL || len <= 0)
+		return;
+
+	for (int i = 0; i < len; i++)
+		data[i] ^= xor_pattern[i % sizeof(xor_pattern)];
+}
+
+// https://github.com/OneOfEleven/k5prog-win/blob/a8af838b91bf17027179881accc1701949d66a0b/Unit1.cpp#L2663
+bool decrypt(unsigned char *flash, int *flash_size) {
+	
+	bool encrypted = true;
+
+	const uint16_t crc1 = crc16(&flash[0], *flash_size - 2);
+	const uint16_t crc2 = ((uint16_t)flash[*flash_size - 1] << 8) | ((uint16_t)flash[*flash_size - 2] << 0);
+
+	if (flash[ 2] == 0x00 &&
+			flash[ 3] == 0x20 &&
+			flash[ 6] == 0x00 &&
+			flash[10] == 0x00 &&
+			flash[14] == 0x00) {
+		encrypted = false;
+	}
+
+	if (encrypted && crc1 == crc2)
+	{	// the file appears to be encrypted
+
+		// drop the 16-bit CRC
+		*flash_size = *flash_size - 2;
+
+		// decrypt it
+		k5_xor_firmware(&flash[0], *flash_size);
+
+		if (flash[ 2] == 0x00 &&
+				flash[ 3] == 0x20 &&
+				flash[ 6] == 0x00 &&
+				flash[10] == 0x00 &&
+				flash[14] == 0x00) {
+			encrypted = false;
+		}
+
+		if (!encrypted)
+		{
+			fprintf(stdout, "firmware file de-obfuscated\n");
+		}
+
+		if (!encrypted && *flash_size >= (0x2000 + 16))
+		{	// extract and remove the 16-byte version string
+
+			char firmware_ver[17] = {0};
+			memcpy(firmware_ver, &flash[0x2000], 16);
+
+			if (*flash_size > (0x2000 + 16))
+				memmove(&flash[0x2000], &flash[0x2000 + 16], *flash_size - 0x2000 - 16);
+			*flash_size = (*flash_size - 16);
+
+			if (strlen(firmware_ver) > 8) {
+				fprintf(stderr, "Firmware version unexpectedly long (%ld): %s\n", strlen(firmware_ver), firmware_ver);
+				return false;
+			}
+			strncpy(flash_version_string, firmware_ver, 8);
+
+			fprintf(stdout, "firmware file version '%s'\n", flash_version_string);
+		}
+	}
+
+	if (encrypted)
+	{
+		fprintf(stderr,"File doesn't appear to be valid for uploading\n");
+		return false;
+	}
+
+	return true;
+}
+
 int main(int argc,char **argv)
 {
 	int fd,ffd;
@@ -995,6 +1104,11 @@ int main(int argc,char **argv)
 			}
 			flash_length=read(ffd,(unsigned char *)&flash,UVK5_MAX_FLASH_SIZE);
 			close(ffd);
+
+			bool success = decrypt(flash, &flash_length);
+			if (!success) {
+				exit(1);
+			}
 
 			/* arbitrary limit do that someone doesn't flash some random short file */
 			if ((i_know_what_im_doing<5)&&(flash_length<50000)) {
