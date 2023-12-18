@@ -229,6 +229,13 @@ int read_timeout(int fd, unsigned char *buf, int maxlen, int timeout)
 
 		ret=select(fd+1,&rfd,0,0,&tv);
 
+		if (ret==0)  {
+			if(timeout) /* Only print if we requested a timeout */
+				fprintf(stderr,"read_timeout\n");
+			/* error albo timeout */
+			break;
+		}
+
 		if (FD_ISSET(fd,&rfd)) {
 			nr=read(fd,buf,maxlen);
 
@@ -236,17 +243,9 @@ int read_timeout(int fd, unsigned char *buf, int maxlen, int timeout)
 			buf=buf+nr;
 			if (nr>=0) maxlen=maxlen-nr;
 			if (maxlen==0) break;
-		} 
-
-
-		if (ret==0)  {
-			fprintf(stderr,"read_timeout\n");
-			/* error albo timeout */
-			break;
 		}
-
 	}
-	if (verbose>2) {
+	if (verbose>2 && len > 0) {
 		printf("RXRXRX:\n");
 		hdump(buf2,len);
 	}
@@ -427,11 +426,22 @@ struct k5_command *k5_receive(int fd,int tmout) {
 		return(0);
 	}
 
+    /* During plugging in etc we can receive a single byte.
+     * Handle this case here. */
+    if (len != sizeof(buf))
+    {
+        fprintf(stderr,"k5_receive: got %d expected %ld\n", len, sizeof(buf));
+        return(0);
+    }
 
-	if ((buf[0]!=0xab)||(buf[1]!=0xcd)) {
-		fprintf(stderr,"k5_receive: bad magic number\n");
-		return(0);
-	}
+    if ((buf[0]!=0xab)||(buf[1]!=0xcd)) {
+        fprintf(stderr,"k5_receive: bad magic number\n");
+        /* Assume we are out of sync and flush rx buffer by reading everything.
+         * This works because the boot message is repeated. */
+        while(len > 0)
+            len =read_timeout(fd,(unsigned char *)&buf,sizeof(buf),0);
+        return(0);
+    }
 
 	if (buf[3]!=0) {
 		fprintf(stderr,"k5_receive: it seems that byte 3 can be something else than 0, please notify the author\n");
@@ -564,8 +574,9 @@ int wait_flash_message(int fd,int ntimes) {
 		cmd=k5_receive(fd,10000);
 
 		if (!cmd) {
-			printf("wait_flash_message: timeout\n");
-			continue; 
+			/* No need to print, k5_receive already printed why it failed */
+			//printf("wait_flash_message: timeout\n");
+			continue;
 		}
 
 		k5_hexdump(cmd);
