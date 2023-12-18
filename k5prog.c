@@ -990,7 +990,7 @@ int main(int argc,char **argv)
 
 			ffd=open(flash_file,O_RDONLY);
 			if (ffd<0) {
-				fprintf(stderr,"open %s error %d %s\n", file, errno, strerror(errno));
+				fprintf(stderr,"open %s error %d %s\n", flash_file, errno, strerror(errno));
 				exit(1);
 			}
 			flash_length=read(ffd,(unsigned char *)&flash,UVK5_MAX_FLASH_SIZE);
