@@ -587,8 +587,8 @@ int wait_flash_message(int fd,int ntimes) {
 			continue;
 		}
 
-		if (cmd->cmd[0]!=0x18) {
-			printf("wait_flash_message: got unexpected command type 0x%2.2x\n",cmd->cmd[0]);
+		if ((cmd->cmd[0]!=0x18)&&(cmd->cmd[1]!=0x05)) {
+			printf("wait_flash_message: got unexpected command type 0x%2.2x 0x%2.2x\n",cmd->cmd[1],cmd->cmd[0]);
 			destroy_k5_struct(cmd);
 			continue;
 		}
@@ -611,11 +611,6 @@ int wait_flash_message(int fd,int ntimes) {
 		 *  0x000020: 00 00 00 20                                       ...                
 		 */
 
-		if ((cmd->cmd[2]!=0x20)||(cmd->cmd[3]!=0x0)||(cmd->cmd[4]!=0x1)||(cmd->cmd[5]!=0x2)||(cmd->cmd[6]!=0x2)) {
-			printf("wait_flash_message: got unexpected packet contents\n");
-			destroy_k5_struct(cmd);
-			continue;
-		}
 
 		/* all is good, so break */
 		ok=1; 	break;
