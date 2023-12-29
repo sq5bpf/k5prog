@@ -232,7 +232,7 @@ int read_timeout(int fd, unsigned char *buf, int maxlen, int timeout)
 		if (ret==0)  {
 			if(timeout) /* Only print if we requested a timeout */
 				fprintf(stderr,"read_timeout\n");
-			/* error albo timeout */
+			/* error or timeout */
 			break;
 		}
 
@@ -438,8 +438,8 @@ struct k5_command *k5_receive(int fd,int tmout) {
         fprintf(stderr,"k5_receive: bad magic number\n");
         /* Assume we are out of sync and flush rx buffer by reading everything.
          * This works because the boot message is repeated. */
-        while(len > 0)
-            len =read_timeout(fd,(unsigned char *)&buf,sizeof(buf),0);
+        whilei (len>0)
+            len =read_timeout(fd,(unsigned char *)&buf,sizeof(buf),10000);
         return(0);
     }
 
