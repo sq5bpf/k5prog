@@ -935,6 +935,14 @@ int k5_prepare(int fd) {
 	cmd=k5_receive(fd,10000);
 	if (!cmd) return(0);
 
+	/* this is a bit problem with people trying to read the radio config in firmware flash mode,
+	 * don't know why people do this, but they do it quite often */
+	if ((cmd->cmd[0]==0x18)&&(cmd->cmd[1]==0x05)) {
+		fprintf(stderr,"\nWARNING: this radio is in firmware flash mode (PTT + turn on).\n"
+				"Please have the radio in normal mode to read the EEPROM\n\n");
+		return(0);
+	}
+	printf ("cmd: %2.2x %2.2x ok:%i\n",cmd->cmd[0],cmd->cmd[1],cmd->crcok);
 	printf("******  Connected to firmware version: [%s]\n",(cmd->cmd)+4);
 	destroy_k5_struct(cmd);
 
