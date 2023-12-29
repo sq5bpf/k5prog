@@ -438,7 +438,7 @@ struct k5_command *k5_receive(int fd,int tmout) {
         fprintf(stderr,"k5_receive: bad magic number\n");
         /* Assume we are out of sync and flush rx buffer by reading everything.
          * This works because the boot message is repeated. */
-        whilei (len>0)
+        while (len>0)
             len =read_timeout(fd,(unsigned char *)&buf,sizeof(buf),10000);
         return(0);
     }
