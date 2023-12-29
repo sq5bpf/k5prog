@@ -1,14 +1,14 @@
 k5prog - Quansheng UV-K5 EEPROM and flash programmer  v0.9
 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
-This program can read and write the eeprom of Quansheng UV-K5.
+This program can read and write the EEPROM of Quansheng UV-K5.
 It can read/write arbitrary data, and might be useful for making backups of
 the configuration, mass programming of radios or reverse engineering of 
 the radio configuration. Please note that it is probably possible to break 
 your radio by writing a bad configuration to it, so please use at your own 
 risk.
 
-Note that this program does not edit the contents of the eeprom. Use an
+Note that this program does not edit the contents of the EEPROM. Use an
 external hex editor.
 
 
@@ -19,7 +19,7 @@ here:
 https://github.com/fagci/qs-uvk5-firmware-modder
 An example decrypted file is provided in k5_flash_test.raw, this is the vendor
 2.01.23 firmware without any modifications.
-Please use extreme caution, as reprogramming the radioflash can potentially i
+Please use extreme caution, as reprogramming the radioflash can potentially
 brick your radio. If unsure, please use the vendor flashing software.
 
 The flashing support in k5prog was used in at least 2 cases to recover radios
@@ -31,38 +31,38 @@ To compile, please see the compiling section at the end.
 
 
 The program is written to (hopefully) run on POSIX systems. Testing was done 
-on GNU/Linux, but MacOS X and windows under cygwin should work too. 
+on GNU/Linux, but macOS and Windows under Cygwin should work too. 
 
 For licensing see the file LICENSE.
 
 
 ---- Usage ----
 
-for help run the programwithout arguments, or with the -h option. 
+to display help run the program without arguments, or with the -h option. 
 
 The configuration options are:
 Quansheng UV-K5 EEPROM programmer v0.8 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
 cmdline opts:
--f <file>       filename that contains the eeprom dump (default: k5_eeprom.raw)
+-f <file>       filename that contains the EEPROM dump (default: k5_eeprom.raw)
 -b <file>       filename that contains the raw flash image (default k5_flash.raw)
--Y      increase "I know what i'm doing" value, to enable functionality likely to break the radio
+-Y      increase "I know what I'm doing" value, to enable functionality likely to break the radio
 -D      wait for the message from the radio flasher, print it's version
 -F      flash firmware, WARNING: this will likely brick your radio!
 -M <ver>        Set the firmware major version to <ver> during the flash process (default: *.01.23)
--r      read eeprom
--w      write eeprom like the original software does
--W      write most of the eeprom (but without what i think is calibration data)
--B      write ALL of the eeprom (the "brick my radio" mode)
+-r      read EEPROM
+-w      write EEPROM like the original software does
+-W      write most of the EEPROM (but without what I think is calibration data)
+-B      write ALL of the EEPROM (the "brick my radio" mode)
 -p <port>       device name (default: /dev/ttyUSB0)
 -s <speed>      serial speed (default: 38400, the UV-K5 doesn't accept any other speed)
 -h      print this help
 -v      be verbose, use multiple times for more verbosity
 
 
----- Reading/writing the configuration eeprom ----
+---- Reading/writing the configuration EEPROM ----
 
-For a basic usage use -r to read eeprom, -w to write eeprom. The -v option
+For a basic usage use -r to read EEPROM, -w to write EEPROM. The -v option
 gives more verbosity.
 
 Read configuration:
@@ -72,10 +72,10 @@ Quansheng UV-K5 EEPROM programmer v0.5 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowsk
 
 k5_prepare: try 0
 ******  Connected to firmware version: [k5_2.01.23]
-Sucessfuly read eeprom
+Successfully read EEPROM
 
 
-The eeprom contents are written to the file k5_eeprom.raw, this can be
+The EEPROM contents are written to the file k5_eeprom.raw, this can be
 changed with the -f option.
 
 
@@ -87,14 +87,14 @@ Quansheng UV-K5 EEPROM programmer v0.5 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowsk
 k5_prepare: try 0
 ******  Connected to firmware version: [k5_2.01.23]
 Read file k5_eeprom.raw success
-Sucessfuly wrote eeprom
+Successfully wrote EEPROM
 
 
 
 The -w option writes only the memory blocks which are written by the original
 radio software, in the same order. 
 
-The -W option is a bit more brave, it writes all memory upto 0x1d00. I _think_
+The -W option is a bit braver as it writes all memory upto 0x1d00. I _think_
 that the radio has calibration data above this address, but of course this is
 not certain, because this knowledge is a result of reverse engineering, and not
 information from the manufacturer.
@@ -105,7 +105,7 @@ allowing overwriting of calibration data (if there is any) or other data which
 may be critical to the proper functioning of your radio. I have used this on
 my radio, and it still works but please be extra-careful.
 
-I have written the radio eeprom with the -W option tens of times, and others 
+I have written the radio EEPROM with the -W option tens of times, and others 
 have too. So far it hasn't produced any bad results. But of course beware.
 
 
@@ -114,14 +114,14 @@ have too. So far it hasn't produced any bad results. But of course beware.
 The flashing support is for the really brave people who know what they are
 doing (hence the -Y flag is needed).
 
-It is possible to read the bootloder version using the -D option. This option
+It is possible to read the bootloader version using the -D option. This option
 is safe, but needs the -Y value. Put the radio into flash mode and:
 
 ./k5prog -Y -D
 
 Quansheng UV-K5 EEPROM programmer v0.5 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
-"I know what i'm doing" value set to 1
+"I know what I'm doing" value set to 1
 ********  k5 command hexdump [obf_len:44 clear_len:36 crc_ok:1 **********
 ## obfuscated ##
 
@@ -143,13 +143,13 @@ Flasher version is: [2.00.06]
 The radio can also be flashed with the raw unencrypted binary.
 An example binary is provided in the  k5_flash.raw  file (this is the 2.01.23
 firmware). The binary file can be specified with the -b option. 
-Flashing the radio requires the "i know what i'm doing value" of at least 5.
+Flashing the radio requires the "I know what I'm doing value" of at least 5.
 
 ./k5prog -b k5_flash.raw  -YYYYYY -F                   
 
 Quansheng UV-K5 EEPROM programmer v0.5 (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
 
-"I know what i'm doing" value set to 6
+"I know what I'm doing" value set to 6
 ********  k5 command hexdump [obf_len:44 clear_len:36 crc_ok:1 **********
 ## obfuscated ##
 
@@ -190,19 +190,19 @@ simple makefile:
 sq5bpf@dellix:~/k5prog-0.1$ make
 gcc -O2 k5prog.c -o k5prog
 
-Other POSIX platforms should work also, including MacOS X. 
+Other POSIX platforms should work also, including macOS. 
 
 The software compiles under Cygwin/Microsoft Windows, but has not been tested.
-According to the cygwin documentation you should use /dev/comX to use port comX
+According to the Cygwin documentation you should use /dev/comX to use port comX
 (for example using com6: k5prog.exe -v -r -p /dev/com6)
 
 
-If port this to another platform, or do anything interesting with this
+If you port this to another platform, or do anything interesting with this
 software, tell me about it.
 
 ---- Other uses ----
 
-The file uvk5_original_eeprom.raw contains an eeprom downloaded from a UV-K5
+The file uvk5_original_eeprom.raw contains an EEPROM downloaded from an UV-K5
 radio.  Maybe it can be used to resurrect another radio of the same type 
 if it was broken (perhaps by the use of this software :).
 
@@ -220,13 +220,13 @@ The format of the datagram sent to the radio is:
 
 0xAB 0xCD len 0x00 <data bytes> <2 bytes CRC> 0xDC 0xBA
 
-The length is the length od the data bytes.
+The length is the length of the data bytes.
 
 The data is protected by a typical CRC-16 xmodem algorithm.
 The data bytes and the CRC are obfuscated by xor-in it with an 8-byte 
 sequence.
 
-Fortunately the eeprom data contains a lot of 0xFF and 0x00 bytes, so the XOR
+Fortunately the EEPROM data contains a lot of 0xFF and 0x00 bytes, so the XOR
 sequence is easy to find by observing the traffic.
 
 
@@ -235,7 +235,7 @@ The datagram sent from the radio is the same, but the CRC field is set to
 obfuscation (same as the XOR).
 
 
-I intend to publish a further description of the protocol, and the eeprom
+I intend to publish a further description of the protocol, and the EEPROM
 contents, meanwhile the sources can be used as documentation.
 
 

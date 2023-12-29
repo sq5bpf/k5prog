@@ -1,7 +1,7 @@
 /* Quansheng UV-K5 EEPROM programmer v0.9 
  * (c) 2023 Jacek Lipkowski <sq5bpf@lipkowski.org>
  *
- * This program can read and write the eeprom of Quansheng UVK5 Mark II 
+ * This program can read and write the EEPROM of Quansheng UVK5 Mark II 
  * and probably other similar radios via the serial port. 
  *
  * It can read/write arbitrary data, and might be useful for reverse
@@ -110,8 +110,8 @@ unsigned char uvk5_hello2[]={0x14, 0x05, 0x04, 0x00, 0x9f, 0x25, 0x5a, 0x64};
 
 /* commands:
  * 0x14 - hello
- * 0x1b - read eeprom
- * 0x1d - write eeprom
+ * 0x1b - read EEPROM
+ * 0x1d - write EEPROM
  * 0xdd - reset radio
  */
 
@@ -465,7 +465,7 @@ struct k5_command *k5_receive(int fd,int tmout) {
 	return(cmd);
 }
 /******************************/
-/*  eeprom read/write support */
+/*  EEPROM read/write support */
 /******************************/
 int k5_readmem(int fd, unsigned char *buf, unsigned char maxlen, int offset)
 {
@@ -552,7 +552,7 @@ int k5_reset(int fd)
 	r=k5_send_buf(fd,uvk5_reset,sizeof(uvk5_reset));
 	return(r);
 }	
-/*  end of eeprom read/write support */
+/*  end of EEPROM read/write support */
 
 
 /******************************/
@@ -759,14 +759,14 @@ void helpme()
 			"cmdline opts:\n"
 			"-f <file>\tfilename that contains the eeprom dump (default: " DEFAULT_FILE_NAME ")\n"
 			"-b <file>\tfilename that contains the raw flash image (default " DEFAULT_FLASH_NAME ")\n"
-			"-Y \tincrease \"I know what i'm doing\" value, to enable functionality likely to break the radio\n"
+			"-Y \tincrease \"I know what I'm doing\" value, to enable functionality likely to break the radio\n"
 			"-D \twait for the message from the radio flasher, print it's version\n"
 			"-F \tflash firmware, WARNING: this will likely brick your radio!\n"
 			"-M <ver> \tSet the firmware major version to <ver> during the flash process (default: " DEFAULT_FLASH_VERSION ")\n"
 			"-r \tread eeprom\n"
 			"-w \twrite eeprom like the original software does\n"
-			"-W \twrite most of the eeprom (but without what i think is calibration data)\n"
-			"-B \twrite ALL of the eeprom (the \"brick my radio\" mode)\n"
+			"-W \twrite most of the EEPROM (but without what I think is calibration data)\n"
+			"-B \twrite ALL of the EEPROM (the \"brick my radio\" mode)\n"
 			"-p <port>\tdevice name (default: " DEFAULT_SERIAL_PORT ")\n"
 			"-s <speed>\tserial speed (default: 38400, the UV-K5 doesn't accept any other speed)\n"
 			"-h \tprint this help\n"
@@ -1009,7 +1009,7 @@ int main(int argc,char **argv)
 
 			/* arbitrary limit do that someone doesn't flash some random short file */
 			if ((i_know_what_im_doing<5)&&(flash_length<50000)) {
-				fprintf(stderr,"Failed to read whole eeprom from file %s (read %i), file too short or some other error\n",file,flash_length);
+				fprintf(stderr,"Failed to read whole EEPROM from file %s (read %i), file too short or some other error\n",file,flash_length);
 				if (flash_length>0) {
 					fprintf(stderr,"This failsafe is here so that people don't mistake config files with flash.\nIt can be ignored with an 'i know what i'm doing' value of at least 5\n");
 				}
@@ -1090,7 +1090,7 @@ int main(int argc,char **argv)
 				}
 			}
 			close(fd);
-			if (verbose>0) { printf("\rSucessfuly read eeprom\n"); }
+			if (verbose>0) { printf("\rSuccessfully read EEPROM\n"); }
 			if (verbose>2) { hdump((unsigned char *)&eeprom,UVK5_EEPROM_SIZE); }
 
 			write_file(file,(unsigned char *)&eeprom,UVK5_EEPROM_SIZE);
@@ -1101,7 +1101,7 @@ int main(int argc,char **argv)
 		case MODE_WRITE_MOST:
 		case MODE_WRITE_ALL:
 			if ((mode==MODE_WRITE_ALL)&&(i_know_what_im_doing<1)) {
-				printf("ERROR: the \"I know what i'm doing\" value has to be at least 1 to confirm that you know what you're doing\n");
+				printf("ERROR: the \"I know what I'm doing\" value has to be at least 1 to confirm that you know what you're doing\n");
 				exit(0);
 			}
 
@@ -1113,7 +1113,7 @@ int main(int argc,char **argv)
 			}
 			r=read(ffd,(unsigned char *)&eeprom[i],UVK5_EEPROM_SIZE);
 			if (r!=UVK5_EEPROM_SIZE) {
-				fprintf(stderr,"Failed to read whole eeprom from file %s, file too short?\n",file);
+				fprintf(stderr,"Failed to read whole EEPROM from file %s, file too short?\n",file);
 				exit(1);
 			}
 			close(ffd);
@@ -1157,7 +1157,7 @@ int main(int argc,char **argv)
 				}
 			}
 			k5_reset(fd);
-			if (verbose>0) { printf("\rSucessfuly wrote eeprom\n"); }
+			if (verbose>0) { printf("\rSuccessfully wrote EEPROM\n"); }
 
 
 			break;

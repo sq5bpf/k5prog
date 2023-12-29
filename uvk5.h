@@ -1,4 +1,4 @@
-/* UV-K5 eeprom programmer */
+/* UV-K5 EEPROM programmer */
 
 #ifndef UVK5_INCLUDE_H
 #define UVK5_INCLUDE_H
