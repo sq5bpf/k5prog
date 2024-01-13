@@ -35,6 +35,7 @@
  *
  */
 
+#include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/select.h>
@@ -255,11 +256,16 @@ int read_timeout(int fd, unsigned char *buf, int maxlen, int timeout)
 
 
 
-void destroy_k5_struct(struct k5_command *cmd)
+void destroy_k5_struct(struct k5_command **cmd)
 {
-	if (cmd->cmd) { free(cmd->cmd); }
-	if (cmd->obfuscated_cmd) { free(cmd->obfuscated_cmd); }
-	free(cmd);
+	if (!*cmd) {
+		return;
+	}
+
+	if ((*cmd)->cmd) { free((*cmd)->cmd); }
+	if ((*cmd)->obfuscated_cmd) { free((*cmd)->obfuscated_cmd); }
+	free(*cmd);
+	*cmd = NULL;
 }
 
 /* ripped from https://mdfs.net/Info/Comp/Comms/CRC16.htm */
@@ -406,42 +412,71 @@ int k5_send_buf(int fd,unsigned char *buf,int len) {
 	cmd->cmd=malloc(cmd->len);
 	memcpy(cmd->cmd,buf,len);
 	l=k5_send_cmd(fd,cmd);
-	destroy_k5_struct(cmd);
+	destroy_k5_struct(&cmd);
 	return(l);
 }
 
+
+int align_and_read_magic_number_0xAB_0xCD(int fd, unsigned char *buf, size_t buf_len, int retries)
+{
+	int alignment_step = 0;
+
+	while (1) {
+		const int len = read_timeout(fd, &buf[alignment_step], 1, 1000);
+
+		if (len == 0) {
+			fprintf(stderr,"k5_receive: err read1\n");
+			return EXIT_FAILURE;
+		}
+
+		if (verbose > 1) {
+			printf("Alignment step: %d byte read: %x\n", alignment_step, buf[alignment_step]);
+			printf("magic:"); hdump((unsigned char *)&buf,len);
+		}
+
+		if (alignment_step == 0 && buf[alignment_step] == 0xab) {
+			alignment_step++;
+		} else if (alignment_step == 1 && buf[alignment_step] == 0xcd) {
+			alignment_step++;
+		} else if (alignment_step == 2) {
+			alignment_step++;
+		} else if (alignment_step == 3) {
+			if (buf[alignment_step] != 0) {
+				fprintf(stderr, "align_to_magic_number_0xAB_0xCD: it seems that byte 3 can be something else than 0, please notify the author\n");
+				return EXIT_FAILURE;
+			}
+			// aligned
+			break;
+		} else {
+			if (!(retries--)) {
+				fprintf(stderr,"k5_receive: err read1\n");
+				return EXIT_FAILURE;
+			}
+
+			tcflush(fd, TCIFLUSH);
+			fprintf(stderr,"Alignment failed. Restarting (step: %d, byte: 0x%x\n", alignment_step, buf[alignment_step]);
+			fprintf(stderr,"k5_receive: got %d expected %ld\n", len, sizeof(buf));
+			alignment_step = 0;
+			memset (buf, 0, buf_len);
+
+		}
+	}
+
+	if (verbose > 1) {
+		printf("Magic received: 0x%#02x, 0x%#02x, 0x%#02x, 0x%#02x\n", buf[0], buf[1], buf[2], buf[3]);
+	}
+
+	return 0;
+}
+
+
 /* receive a response, deobfuscate it */
-struct k5_command *k5_receive(int fd,int tmout) {
-	unsigned char buf[4];
+struct k5_command *k5_receive(int fd, int tmout) {
+	unsigned char buf[4] = { 0 };
 	struct k5_command *cmd;
 	int len;
 
-	len=read_timeout(fd,(unsigned char *)&buf,sizeof(buf),10000); /* wait 500ms */
-
-	if (len>0) {
-		if (verbose>2)	{ printf("magic:\n"); hdump((unsigned char *)&buf,len); }
-	} else
-	{
-		fprintf(stderr,"k5_receive: err read1\n");
-		return(0);
-	}
-
-    /* During plugging in etc we can receive a single byte.
-     * Handle this case here. */
-    if (len != sizeof(buf))
-    {
-        fprintf(stderr,"k5_receive: got %d expected %ld\n", len, sizeof(buf));
-        return(0);
-    }
-
-    if ((buf[0]!=0xab)||(buf[1]!=0xcd)) {
-        fprintf(stderr,"k5_receive: bad magic number\n");
-        /* Assume we are out of sync and flush rx buffer by reading everything.
-         * This works because the boot message is repeated. */
-        while (len>0)
-            len =read_timeout(fd,(unsigned char *)&buf,sizeof(buf),10000);
-        return(0);
-    }
+	align_and_read_magic_number_0xAB_0xCD(fd,(unsigned char *)&buf,sizeof(buf), 100);
 
 	if (buf[3]!=0) {
 		fprintf(stderr,"k5_receive: it seems that byte 3 can be something else than 0, please notify the author\n");
@@ -452,9 +487,10 @@ struct k5_command *k5_receive(int fd,int tmout) {
 	cmd->obfuscated_len=buf[2]+8;
 	cmd->obfuscated_cmd=calloc(cmd->obfuscated_len,1);
 	memcpy(cmd->obfuscated_cmd,buf,4);
-	len=read_timeout(fd,cmd->obfuscated_cmd+4,buf[2]+4,tmout); /* wait 500ms */
+	len=read_timeout(fd,cmd->obfuscated_cmd+4,buf[2]+4,tmout);
 	if ((len+4)!=(cmd->obfuscated_len)) {
 		fprintf(stderr,"k5_receive err read1 len=%i wanted=%i\n",len,cmd->obfuscated_len);
+		destroy_k5_struct(&cmd);
 		return(0);
 	}
 
@@ -485,14 +521,17 @@ int k5_readmem(int fd, unsigned char *buf, unsigned char maxlen, int offset)
 
 	r=k5_send_buf(fd,readmem,sizeof(readmem));
 	if (!r) return(0);
-	cmd=k5_receive(fd,10000);
-	if (!cmd) return(0);
+	cmd=k5_receive(fd,1000);
+	if (!cmd || !cmd->cmd){
+		destroy_k5_struct(&cmd);
+		return(0);
+	}
 
 
 	if (verbose>2) k5_hexdump(cmd);
 
 	memcpy(buf,cmd->cmd+8,cmd->len-8);
-	destroy_k5_struct(cmd);
+	destroy_k5_struct(&cmd);
 	return(1);
 
 }
@@ -528,18 +567,21 @@ int k5_writemem(int fd, unsigned char *buf, unsigned char len, int offset)
 	r=k5_send_buf(fd,writemem,len+12);
 	if (!r) return(0);
 
-	cmd=k5_receive(fd,10000);
-	if (!cmd) return(0);
+	cmd=k5_receive(fd,1000);
+	if (!cmd || !cmd->cmd){
+		destroy_k5_struct(&cmd);
+		return(0);
+	}
 
 	if (verbose>2) k5_hexdump(cmd);
 
 	if (((cmd->cmd[0])!=0x1e)||((cmd->cmd[4])!=writemem[4])||((cmd->cmd[5])!=writemem[5])) {
 		fprintf(stderr,"bad write confirmation\n");
-		destroy_k5_struct(cmd);
+		destroy_k5_struct(&cmd);
 		return(0);
 	}
 
-	destroy_k5_struct(cmd);
+	destroy_k5_struct(&cmd);
 	return(1);
 }
 
@@ -571,7 +613,7 @@ int wait_flash_message(int fd,int ntimes) {
 
 		if (verbose>1) { printf("wait_flash_message try %i\n",ntimes); }
 
-		cmd=k5_receive(fd,10000);
+		cmd=k5_receive(fd,1000);
 
 		if (!cmd) {
 			/* No need to print, k5_receive already printed why it failed */
@@ -583,20 +625,20 @@ int wait_flash_message(int fd,int ntimes) {
 
 		if (!cmd->cmd) {
 			printf("wait_flash_message: received malformed packet\n");
-			destroy_k5_struct(cmd);
+			destroy_k5_struct(&cmd);
 			continue;
 		}
 
 		if ((cmd->cmd[0]!=0x18)&&(cmd->cmd[1]!=0x05)) {
 			printf("wait_flash_message: got unexpected command type 0x%2.2x 0x%2.2x\n",cmd->cmd[1],cmd->cmd[0]);
-			destroy_k5_struct(cmd);
+			destroy_k5_struct(&cmd);
 			continue;
 		}
 		/* 36 is normal length, 22 is sent by some LSENG UV-K5 clone, 
 		 * 20 is sent by some other version, so just use an arbitrarily chosen range */
 		if ((cmd->len<18)||(cmd->len>50)) {
 			printf("wait_flash_message: got unexpected command length %i\n",cmd->len);
-			destroy_k5_struct(cmd);
+			destroy_k5_struct(&cmd);
 			continue;
 		}
 
@@ -631,7 +673,7 @@ int wait_flash_message(int fd,int ntimes) {
 	}
 	buf[i]=0;
 	printf("Flasher version is: [%s]\n",buf);
-	destroy_k5_struct(cmd);
+	destroy_k5_struct(&cmd);
 	return(1);
 }
 
@@ -654,11 +696,11 @@ int k5_send_flash_version_message(int fd,char *version_string) {
 	if (!r) return(0);
 
 	/* check if we're still getting packets, usually this is a 0x18 type packet, but not sure what else the radio can send  */
-	cmd=k5_receive(fd,10000);
+	cmd=k5_receive(fd,1000);
 	if (!cmd) return(0);
 
 	if (verbose>1) k5_hexdump(cmd);
-	destroy_k5_struct(cmd);
+	destroy_k5_struct(&cmd);
 
 	return(1);
 }
@@ -708,9 +750,12 @@ int k5_writeflash(int fd, unsigned char *buf, int  len, int offset,int max_flash
 	/* wait for a reply packet */
 	l=5;
 	while(l) {
-		cmd=k5_receive(fd,10000);
+		cmd=k5_receive(fd,1000);
 		l--;
-		if (!cmd) { 
+		if (!cmd || !cmd->cmd) {
+			if (cmd) {
+				destroy_k5_struct(&cmd);
+			}
 			usleep(1000); 
 			continue;
 		}
@@ -722,7 +767,7 @@ int k5_writeflash(int fd, unsigned char *buf, int  len, int offset,int max_flash
 		/* we're still getting "i'm in flash mode packets", can happen after the first flash command, ignore it */
 		if ((cmd->cmd[0]==0x18)&&(cmd->cmd[1]==0x05)&&(cmd->cmd[2]==0x20)&&(cmd->cmd[3]==0x0)&&(cmd->cmd[4]==0x1)&&(cmd->cmd[5]==0x2)&&(cmd->cmd[6]==0x2)) {
 			if (verbose>1)  printf("&&&&|  ignoring \"i'm in flash mode\" packet\n");
-			destroy_k5_struct(cmd);
+			destroy_k5_struct(&cmd);
 			continue;
 		}
 
@@ -732,11 +777,11 @@ int k5_writeflash(int fd, unsigned char *buf, int  len, int offset,int max_flash
 		 */
 		if (((cmd->cmd[0])!=0x1a)||((cmd->cmd[8])!=writeflash[8])||((cmd->cmd[9])!=writeflash[9])) {
 			fprintf(stderr,"bad write confirmation\n");
-			destroy_k5_struct(cmd);
+			destroy_k5_struct(&cmd);
 			continue;
 		}
 		ok=1; 
-		destroy_k5_struct(cmd);
+		destroy_k5_struct(&cmd);
 		break;
 	}
 
@@ -932,19 +977,24 @@ int k5_prepare(int fd) {
 
 	r=k5_send_buf(fd,uvk5_hello,sizeof(uvk5_hello));
 	if (!r) return(0);
-	cmd=k5_receive(fd,10000);
-	if (!cmd) return(0);
+	cmd=k5_receive(fd,1000);
+	if (!cmd || !cmd->cmd){
+		destroy_k5_struct(&cmd);
+		return(0);
+	}
 
 	/* this is a bit problem with people trying to read the radio config in firmware flash mode,
 	 * don't know why people do this, but they do it quite often */
 	if ((cmd->cmd[0]==0x18)&&(cmd->cmd[1]==0x05)) {
 		fprintf(stderr,"\nWARNING: this radio is in firmware flash mode (PTT + turn on).\n"
 				"Please have the radio in normal mode to read the EEPROM\n\n");
+		destroy_k5_struct(&cmd);
 		return(0);
 	}
+
 	printf ("cmd: %2.2x %2.2x ok:%i\n",cmd->cmd[0],cmd->cmd[1],cmd->crcok);
 	printf("******  Connected to firmware version: [%s]\n",(cmd->cmd)+4);
-	destroy_k5_struct(cmd);
+	destroy_k5_struct(&cmd);
 
 	return(1);
 }
