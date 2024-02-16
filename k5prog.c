@@ -199,6 +199,7 @@ int openport(char *port,speed_t speed)
 	my_termios.c_cflag =  CS8 |CREAD | CLOCAL | HUPCL;
 	cfmakeraw(&my_termios);
 	cfsetospeed(&my_termios, speed);
+	cfsetispeed(&my_termios, speed);
 	if (	tcsetattr(fd, TCSANOW, &my_termios))
 	{
 		printf("tcsetattr error %d %s\n", errno, strerror(errno));
